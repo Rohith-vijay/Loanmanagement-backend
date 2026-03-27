@@ -1,21 +1,32 @@
 package com.loanmanagement.loan;
 
+import com.loanmanagement.payment.Payment;
+import com.loanmanagement.user.User;
 import jakarta.persistence.*;
+import lombok.*;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "loans")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Loan {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
-    private Long userId;
-
-    private Long applicationId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private User user;
 
     @Column(nullable = false)
     private BigDecimal principalAmount;
@@ -26,111 +37,30 @@ public class Loan {
     @Column(nullable = false)
     private Integer durationMonths;
 
+    private BigDecimal emiAmount;
+
     private BigDecimal remainingBalance;
 
-    private String status; // ACTIVE, COMPLETED, DEFAULTED
+    private String status; // PENDING, APPROVED, REJECTED, ACTIVE, CLOSED
 
     private LocalDateTime startDate;
     private LocalDateTime endDate;
 
+    @Builder.Default
+    @Column(updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Builder.Default
     private LocalDateTime updatedAt = LocalDateTime.now();
 
-    public Loan() {}
+    @OneToMany(mappedBy = "loan", cascade = CascadeType.ALL, orphanRemoval = true)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    @Builder.Default
+    private List<Payment> payments = new ArrayList<>();
 
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public Long getUserId() {
-        return userId;
-    }
-
-    public void setUserId(Long userId) {
-        this.userId = userId;
-    }
-
-    public Long getApplicationId() {
-        return applicationId;
-    }
-
-    public void setApplicationId(Long applicationId) {
-        this.applicationId = applicationId;
-    }
-
-    public BigDecimal getPrincipalAmount() {
-        return principalAmount;
-    }
-
-    public void setPrincipalAmount(BigDecimal principalAmount) {
-        this.principalAmount = principalAmount;
-    }
-
-    public BigDecimal getInterestRate() {
-        return interestRate;
-    }
-
-    public void setInterestRate(BigDecimal interestRate) {
-        this.interestRate = interestRate;
-    }
-
-    public Integer getDurationMonths() {
-        return durationMonths;
-    }
-
-    public void setDurationMonths(Integer durationMonths) {
-        this.durationMonths = durationMonths;
-    }
-
-    public BigDecimal getRemainingBalance() {
-        return remainingBalance;
-    }
-
-    public void setRemainingBalance(BigDecimal remainingBalance) {
-        this.remainingBalance = remainingBalance;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
-    public LocalDateTime getStartDate() {
-        return startDate;
-    }
-
-    public void setStartDate(LocalDateTime startDate) {
-        this.startDate = startDate;
-    }
-
-    public LocalDateTime getEndDate() {
-        return endDate;
-    }
-
-    public void setEndDate(LocalDateTime endDate) {
-        this.endDate = endDate;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
+    @PreUpdate
+    public void preUpdate() {
+        this.updatedAt = LocalDateTime.now();
     }
 }

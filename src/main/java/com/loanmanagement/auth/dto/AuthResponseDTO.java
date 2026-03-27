@@ -1,13 +1,16 @@
 package com.loanmanagement.auth.dto;
 
+import com.loanmanagement.user.dto.UserResponseDTO;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
 public class AuthResponseDTO {
     private String token;
-
-    public AuthResponseDTO(String token) {
-        this.token = token;
-    }
-
-    public String getToken() {
-        return token;
-    }
+    private UserResponseDTO user;
 }

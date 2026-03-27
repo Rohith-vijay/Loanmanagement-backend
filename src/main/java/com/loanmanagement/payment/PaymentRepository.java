@@ -8,5 +8,4 @@ import java.util.List;
 @Repository
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
     List<Payment> findByLoanId(Long loanId);
-    List<Payment> findByStatus(String status);
 }

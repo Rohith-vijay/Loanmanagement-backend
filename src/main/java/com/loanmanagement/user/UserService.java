@@ -1,82 +1,69 @@
 package com.loanmanagement.user;
 
-import com.loanmanagement.user.dto.CreateUserRequestDTO;
+import com.loanmanagement.exception.BadRequestException;
+import com.loanmanagement.exception.ResourceNotFoundException;
 import com.loanmanagement.user.dto.UpdateUserRequestDTO;
 import com.loanmanagement.user.dto.UserResponseDTO;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class UserService {
 
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public UserService(UserRepository userRepository) {
-        this.userRepository = userRepository;
-    }
-
-    public UserResponseDTO createUser(CreateUserRequestDTO request) {
-
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already exists");
-        }
-
-        User user = new User();
-        user.setName(request.getName());
-        user.setEmail(request.getEmail());
-        user.setPassword(request.getPassword());
-        user.setRole(request.getRole());
-        user.setPhone(request.getPhone());
-        user.setAddress(request.getAddress());
-
-        User savedUser = userRepository.save(user);
-
-        return mapToDTO(savedUser);
+    public UserResponseDTO getUserById(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id " + id));
+        return mapToResponse(user);
     }
 
     public List<UserResponseDTO> getAllUsers() {
-        return userRepository.findAll()
-                .stream()
-                .map(this::mapToDTO)
+        return userRepository.findAll().stream()
+                .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
-    public UserResponseDTO getUserById(Long id) {
-
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        return mapToDTO(user);
-    }
-
+    @Transactional
     public UserResponseDTO updateUser(Long id, UpdateUserRequestDTO request) {
-
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id " + id));
 
-        user.setName(request.getName());
-        user.setPhone(request.getPhone());
-        user.setAddress(request.getAddress());
+        if (request.getName() != null) user.setName(request.getName());
+        if (request.getPhone() != null) user.setPhone(request.getPhone());
+        if (request.getAddress() != null) user.setAddress(request.getAddress());
+        if (request.getRole() != null) user.setRole(request.getRole());
+        if (request.getActive() != null) user.setActive(request.getActive());
 
-        User updatedUser = userRepository.save(user);
-
-        return mapToDTO(updatedUser);
+        user = userRepository.save(user);
+        return mapToResponse(user);
     }
 
+    @Transactional
     public void deleteUser(Long id) {
+        if (!userRepository.existsById(id)) {
+            throw new ResourceNotFoundException("User not found with id " + id);
+        }
         userRepository.deleteById(id);
     }
 
-    private UserResponseDTO mapToDTO(User user) {
-
-        return new UserResponseDTO(
-                user.getId(),
-                user.getName(),
-                user.getEmail(),
-                user.getRole(),
-                user.getCreatedAt()
-        );
+    public UserResponseDTO mapToResponse(User user) {
+        return UserResponseDTO.builder()
+                .id(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .role(user.getRole())
+                .phone(user.getPhone())
+                .address(user.getAddress())
+                .active(user.getActive())
+                .createdAt(user.getCreatedAt())
+                .build();
     }
 }

@@ -1,67 +1,92 @@
 package com.loanmanagement.payment;
 
-import com.loanmanagement.payment.dto.PaymentRequest;
-import com.loanmanagement.payment.dto.PaymentResponse;
-import com.loanmanagement.payment.transaction.Transaction;
-import com.loanmanagement.payment.transaction.TransactionRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.loanmanagement.exception.BadRequestException;
+import com.loanmanagement.exception.ResourceNotFoundException;
+import com.loanmanagement.loan.Loan;
+import com.loanmanagement.loan.LoanRepository;
+import com.loanmanagement.payment.dto.PaymentRequestDTO;
+import com.loanmanagement.payment.dto.PaymentResponseDTO;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class PaymentService {
 
-    @Autowired
-    private PaymentRepository paymentRepository;
+    private final PaymentRepository paymentRepository;
+    private final LoanRepository loanRepository;
+    private final com.loanmanagement.email.EmailService emailService;
 
-    @Autowired
-    private TransactionRepository transactionRepository;
+    @Transactional
+    public PaymentResponseDTO makePayment(Long loanId, PaymentRequestDTO request) {
+        Loan loan = loanRepository.findById(loanId)
+                .orElseThrow(() -> new ResourceNotFoundException("Loan not found"));
 
-    public PaymentResponse processPayment(PaymentRequest request) {
-        Payment payment = new Payment();
-        payment.setLoanId(request.getLoanId());
-        payment.setAmount(request.getAmount());
-        payment.setPaymentMethod(request.getPaymentMethod());
-        payment.setStatus("COMPLETED");
-        payment.setPaymentDate(LocalDateTime.now());
+        if ("CLOSED".equals(loan.getStatus()) || "REJECTED".equals(loan.getStatus())) {
+            throw new BadRequestException("Payments cannot be made to a closed or rejected loan.");
+        }
+
+        if (request.getAmount().compareTo(loan.getRemainingBalance()) > 0) {
+            throw new BadRequestException("Payment amount exceeds the remaining loan balance.");
+        }
+
+        String transactionRef = UUID.randomUUID().toString();
+
+        Payment payment = Payment.builder()
+                .loan(loan)
+                .amount(request.getAmount())
+                .paymentDate(LocalDateTime.now())
+                .status("COMPLETED")
+                .paymentMethod(request.getPaymentMethod())
+                .transactionReference(transactionRef)
+                .build();
+
+        payment = paymentRepository.save(payment);
+
+        // Update Loan Remaining Balance
+        loan.setRemainingBalance(loan.getRemainingBalance().subtract(request.getAmount()));
         
-        Payment savedPayment = paymentRepository.save(payment);
+        if (loan.getRemainingBalance().compareTo(BigDecimal.ZERO) == 0) {
+            loan.setStatus("CLOSED");
+        } else if ("PENDING".equals(loan.getStatus()) || "APPROVED".equals(loan.getStatus())) {
+            loan.setStatus("ACTIVE"); // First payment activates the loan
+        }
 
-        Transaction transaction = new Transaction();
-        transaction.setPaymentId(savedPayment.getId());
-        transaction.setTransactionReference(UUID.randomUUID().toString());
-        transaction.setAmount(savedPayment.getAmount());
-        transaction.setStatus("SUCCESS");
-        transaction.setTransactionDate(LocalDateTime.now());
-        
-        transactionRepository.save(transaction);
+        loanRepository.save(loan);
 
-        return mapToResponse(savedPayment);
-    }
+        emailService.sendPaymentSuccessEmail(loan.getUser().getEmail(), loan.getUser().getName(), loan.getId(), request.getAmount().toString());
 
-    public PaymentResponse getPaymentById(Long id) {
-        Payment payment = paymentRepository.findById(id).orElseThrow(() -> new RuntimeException("Payment not found"));
         return mapToResponse(payment);
     }
 
-    public List<PaymentResponse> getPaymentsByLoanId(Long loanId) {
+    public List<PaymentResponseDTO> getPaymentsByLoan(Long loanId) {
         return paymentRepository.findByLoanId(loanId).stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
-    private PaymentResponse mapToResponse(Payment payment) {
-        PaymentResponse response = new PaymentResponse();
-        response.setId(payment.getId());
-        response.setLoanId(payment.getLoanId());
-        response.setAmount(payment.getAmount());
-        response.setPaymentDate(payment.getPaymentDate());
-        response.setStatus(payment.getStatus());
-        response.setPaymentMethod(payment.getPaymentMethod());
-        return response;
+    public PaymentResponseDTO getPaymentById(Long id) {
+        Payment payment = paymentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Payment not found"));
+        return mapToResponse(payment);
+    }
+
+    public PaymentResponseDTO mapToResponse(Payment payment) {
+        return PaymentResponseDTO.builder()
+                .id(payment.getId())
+                .loanId(payment.getLoan().getId())
+                .amount(payment.getAmount())
+                .paymentDate(payment.getPaymentDate())
+                .status(payment.getStatus())
+                .paymentMethod(payment.getPaymentMethod())
+                .transactionReference(payment.getTransactionReference())
+                .build();
     }
 }

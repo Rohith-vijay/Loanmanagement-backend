@@ -1,15 +1,25 @@
 package com.loanmanagement.auth.dto;
 
 import com.loanmanagement.user.Role;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import lombok.Data;
 
+@Data
 public class RegisterRequestDTO {
+    @NotBlank(message = "Name is required")
     private String name;
-    private String email;
-    private String password;
-    private Role role;
 
-    public String getName() { return name; }
-    public String getEmail() { return email; }
-    public String getPassword() { return password; }
-    public Role getRole() { return role; }
+    @NotBlank(message = "Email is required")
+    @Email(message = "Invalid email format")
+    private String email;
+
+    @NotBlank(message = "Password is required")
+    @Size(min = 6, message = "Password must be at least 6 characters")
+    private String password;
+
+    private String phone;
+    private String address;
+    private Role role; // Optional, might be used for initialization
 }

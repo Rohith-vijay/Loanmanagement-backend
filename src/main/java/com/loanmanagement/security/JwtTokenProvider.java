@@ -1,6 +1,9 @@
 package com.loanmanagement.security;
 
 import io.jsonwebtoken.*;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import java.util.Date;
@@ -8,32 +11,50 @@ import java.util.Date;
 @Component
 public class JwtTokenProvider {
 
-    private final String SECRET_KEY = "secret123";
-    private final long EXPIRATION = 86400000;
+    @Value("${app.jwt-secret:MySuperSecretKeyForLoanManagementSystemWhichMustBeLong}")
+    private String jwtSecret;
 
-    public String generateToken(String email) {
+    @Value("${app.jwt-expiration-milliseconds:86400000}") // 1 day default
+    private int jwtExpirationInMs;
+
+    public String generateToken(Authentication authentication) {
+        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + jwtExpirationInMs);
+
         return Jwts.builder()
-                .setSubject(email)
+                .setSubject(userDetails.getUsername())
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION))
-                .signWith(SignatureAlgorithm.HS256, SECRET_KEY)
+                .setExpiration(expiryDate)
+                .signWith(SignatureAlgorithm.HS512, jwtSecret)
                 .compact();
     }
 
-    public String getEmail(String token) {
-        return Jwts.parser()
-                .setSigningKey(SECRET_KEY)
+    public String getUsernameFromJWT(String token) {
+        Claims claims = Jwts.parser()
+                .setSigningKey(jwtSecret)
                 .parseClaimsJws(token)
-                .getBody()
-                .getSubject();
+                .getBody();
+
+        return claims.getSubject();
     }
 
-    public boolean validateToken(String token) {
+    public boolean validateToken(String authToken) {
         try {
-            Jwts.parser().setSigningKey(SECRET_KEY).parseClaimsJws(token);
+            Jwts.parser().setSigningKey(jwtSecret).parseClaimsJws(authToken);
             return true;
-        } catch (Exception e) {
-            return false;
+        } catch (SignatureException ex) {
+            System.err.println("Invalid JWT signature");
+        } catch (MalformedJwtException ex) {
+            System.err.println("Invalid JWT token");
+        } catch (ExpiredJwtException ex) {
+            System.err.println("Expired JWT token");
+        } catch (UnsupportedJwtException ex) {
+            System.err.println("Unsupported JWT token");
+        } catch (IllegalArgumentException ex) {
+            System.err.println("JWT claims string is empty.");
         }
+        return false;
     }
 }

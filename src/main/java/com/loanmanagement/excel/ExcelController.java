@@ -2,12 +2,15 @@ package com.loanmanagement.excel;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.InputStreamResource;
-import org.springframework.http.*;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.io.InputStream;
-import java.util.List;
+import java.io.ByteArrayInputStream;
 
 @RestController
 @RequestMapping("/api/excel")
@@ -16,24 +19,18 @@ public class ExcelController {
 
     private final ExcelService excelService;
 
-    // 🔹 Upload Excel
-    @PostMapping("/upload")
-    public List<List<String>> uploadExcel(@RequestParam("file") MultipartFile file) {
+    @GetMapping("/download/loans")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<InputStreamResource> downloadLoansExcel() {
+        ByteArrayInputStream in = excelService.generateLoansExcel();
 
-        return excelService.uploadExcel(file);
-    }
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("Content-Disposition", "attachment; filename=loans_report.xlsx");
 
-    // 🔹 Download Excel
-    @GetMapping("/download")
-    public ResponseEntity<InputStreamResource> downloadExcel() {
-
-        InputStream stream = excelService.downloadExcel();
-
-        InputStreamResource file = new InputStreamResource(stream);
-
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=loans.xlsx")
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .body(file);
+        return ResponseEntity
+                .ok()
+                .headers(headers)
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(new InputStreamResource(in));
     }
 }
