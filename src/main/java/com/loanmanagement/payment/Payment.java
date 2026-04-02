@@ -8,7 +8,10 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "payments")
+@Table(name = "payments", indexes = {
+    @Index(name = "idx_payment_loan_id", columnList = "loan_id"),
+    @Index(name = "idx_payment_status", columnList = "status")
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -25,17 +28,27 @@ public class Payment {
     @EqualsAndHashCode.Exclude
     private Loan loan;
 
-    @Column(nullable = false)
+    @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal amount;
 
     @Builder.Default
     private LocalDateTime paymentDate = LocalDateTime.now();
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String status; // PENDING, COMPLETED, FAILED
+    @Builder.Default
+    private PaymentStatus status = PaymentStatus.PENDING;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String paymentMethod; // CREDIT_CARD, DEBIT_CARD, UPI, BANK_TRANSFER
-    
+    private PaymentMethod paymentMethod;
+
+    @Column(unique = true)
     private String transactionReference;
+
+    private String failureReason;
+
+    @Builder.Default
+    @Column(updatable = false)
+    private LocalDateTime createdAt = LocalDateTime.now();
 }

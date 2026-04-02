@@ -1,59 +1,90 @@
 package com.loanmanagement.security;
 
+import com.loanmanagement.user.User;
 import io.jsonwebtoken.*;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.security.SecurityException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
+import javax.crypto.SecretKey;
 import java.util.Date;
 
 @Component
+@Slf4j
 public class JwtTokenProvider {
 
-    @Value("${app.jwt-secret:MySuperSecretKeyForLoanManagementSystemWhichMustBeLong}")
+    @Value("${app.jwt-secret}")
     private String jwtSecret;
 
-    @Value("${app.jwt-expiration-milliseconds:86400000}") // 1 day default
-    private int jwtExpirationInMs;
+    @Value("${app.jwt-expiration-milliseconds:86400000}")
+    private long jwtExpirationInMs;
+
+    private SecretKey getSigningKey() {
+        byte[] keyBytes = Decoders.BASE64.decode(
+                java.util.Base64.getEncoder().encodeToString(jwtSecret.getBytes())
+        );
+        return Keys.hmacShaKeyFor(keyBytes);
+    }
 
     public String generateToken(Authentication authentication) {
-        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+        User user = (User) authentication.getPrincipal();
+        return buildToken(user.getEmail(), user.getRole().name());
+    }
 
+    public String generateTokenForUser(User user) {
+        return buildToken(user.getEmail(), user.getRole().name());
+    }
+
+    private String buildToken(String email, String role) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationInMs);
 
         return Jwts.builder()
-                .setSubject(userDetails.getUsername())
-                .setIssuedAt(new Date())
-                .setExpiration(expiryDate)
-                .signWith(SignatureAlgorithm.HS512, jwtSecret)
+                .subject(email)
+                .claim("role", role)
+                .issuedAt(now)
+                .expiration(expiryDate)
+                .signWith(getSigningKey())
                 .compact();
     }
 
     public String getUsernameFromJWT(String token) {
-        Claims claims = Jwts.parser()
-                .setSigningKey(jwtSecret)
-                .parseClaimsJws(token)
-                .getBody();
+        return parseClaims(token).getSubject();
+    }
 
-        return claims.getSubject();
+    public String getRoleFromJWT(String token) {
+        return parseClaims(token).get("role", String.class);
+    }
+
+    private Claims parseClaims(String token) {
+        return Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
     }
 
     public boolean validateToken(String authToken) {
         try {
-            Jwts.parser().setSigningKey(jwtSecret).parseClaimsJws(authToken);
+            Jwts.parser()
+                    .verifyWith(getSigningKey())
+                    .build()
+                    .parseSignedClaims(authToken);
             return true;
-        } catch (SignatureException ex) {
-            System.err.println("Invalid JWT signature");
+        } catch (SecurityException ex) {
+            log.warn("Invalid JWT signature: {}", ex.getMessage());
         } catch (MalformedJwtException ex) {
-            System.err.println("Invalid JWT token");
+            log.warn("Invalid JWT token: {}", ex.getMessage());
         } catch (ExpiredJwtException ex) {
-            System.err.println("Expired JWT token");
+            log.warn("Expired JWT token: {}", ex.getMessage());
         } catch (UnsupportedJwtException ex) {
-            System.err.println("Unsupported JWT token");
+            log.warn("Unsupported JWT token: {}", ex.getMessage());
         } catch (IllegalArgumentException ex) {
-            System.err.println("JWT claims string is empty.");
+            log.warn("JWT claims string is empty: {}", ex.getMessage());
         }
         return false;
     }

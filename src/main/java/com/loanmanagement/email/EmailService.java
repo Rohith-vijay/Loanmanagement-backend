@@ -2,8 +2,11 @@ package com.loanmanagement.email;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -14,11 +17,20 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
-    @Async
+    @Value("${app.mail.from:noreply@loanmanagementsystem.com}")
+    private String fromAddress;
+
+    @Async("emailTaskExecutor")
+    @Retryable(
+            retryFor = {Exception.class},
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 2000, multiplier = 2)
+    )
     public void sendEmail(String to, String subject, String body) {
+        log.info("Attempting to send email to {} with subject: {}", to, subject);
         try {
             SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom("noreply@loanmanagement.com");
+            message.setFrom(fromAddress);
             message.setTo(to);
             message.setSubject(subject);
             message.setText(body);
@@ -26,7 +38,15 @@ public class EmailService {
             log.info("Email sent successfully to: {}", to);
         } catch (Exception e) {
             log.error("Failed to send email to {}", to, e);
+            throw e; // Rethrow to trigger retry
         }
+    }
+
+    public void sendWelcomeEmail(String toEmail, String userName) {
+        String subject = "Welcome to Loan Management System";
+        String body = String.format("Dear %s,\n\nWelcome to our SaaS Loan Management System. " +
+                "Your account has been created successfully.\n\nThank you for choosing us.", userName);
+        sendEmail(toEmail, subject, body);
     }
 
     public void sendLoanApprovalEmail(String toEmail, String userName, Long loanId) {
@@ -43,7 +63,13 @@ public class EmailService {
 
     public void sendPaymentSuccessEmail(String toEmail, String userName, Long loanId, String amount) {
         String subject = "Payment Successful - Loan Management System";
-        String body = String.format("Dear %s,\n\nYour payment of %s for Loan ID %d was successful.\n\nThank you.", userName, amount, loanId);
+        String body = String.format("Dear %s,\n\nYour payment of ₹%s for Loan ID %d was successful.\n\nThank you.", userName, amount, loanId);
+        sendEmail(toEmail, subject, body);
+    }
+
+    public void sendEmiReminderEmail(String toEmail, String userName, Long loanId, String emiAmount, String dueDate) {
+        String subject = "EMI Reminder - Loan Management System";
+        String body = String.format("Dear %s,\n\nThis is a friendly reminder that your EMI of ₹%s for Loan ID %d is due on %s.\n\nPlease ensure your account has sufficient balance.\n\nThank you.", userName, emiAmount, loanId, dueDate);
         sendEmail(toEmail, subject, body);
     }
 }

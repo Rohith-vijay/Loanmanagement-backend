@@ -2,20 +2,17 @@ package com.loanmanagement.loan;
 
 import com.loanmanagement.loan.dto.LoanRequestDTO;
 import com.loanmanagement.loan.dto.LoanResponseDTO;
-import com.loanmanagement.security.JwtTokenProvider;
+import com.loanmanagement.user.User;
 import com.loanmanagement.util.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import com.loanmanagement.user.User;
-import com.loanmanagement.user.UserRepository;
-import com.loanmanagement.exception.ResourceNotFoundException;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/loans")
@@ -23,52 +20,56 @@ import java.util.List;
 public class LoanController {
 
     private final LoanService loanService;
-    private final UserRepository userRepository;
 
     @PostMapping("/apply")
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasAnyRole('BORROWER', 'USER')")
     public ResponseEntity<ApiResponse<LoanResponseDTO>> applyForLoan(
-            Authentication authentication,
+            @AuthenticationPrincipal User currentUser,
             @Valid @RequestBody LoanRequestDTO request) {
-        
-        String email = ((UserDetails) authentication.getPrincipal()).getUsername();
-        User user = userRepository.findByEmail(email).orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        
-        LoanResponseDTO loan = loanService.applyForLoan(user.getId(), request);
-        return ResponseEntity.ok(ApiResponse.success(loan, "Loan applied successfully"));
+        LoanResponseDTO loan = loanService.applyForLoan(currentUser.getId(), request);
+        return ResponseEntity.ok(ApiResponse.success(loan, "Loan application submitted successfully"));
     }
 
     @GetMapping("/my-loans")
-    @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<ApiResponse<List<LoanResponseDTO>>> getMyLoans(Authentication authentication) {
-        String email = ((UserDetails) authentication.getPrincipal()).getUsername();
-        User user = userRepository.findByEmail(email).orElseThrow();
-        
-        List<LoanResponseDTO> loans = loanService.getLoansByUser(user.getId());
-        return ResponseEntity.ok(ApiResponse.success(loans, "User loans retrieved successfully"));
+    @PreAuthorize("hasAnyRole('BORROWER', 'USER', 'ADMIN')")
+    public ResponseEntity<ApiResponse<Page<LoanResponseDTO>>> getMyLoans(
+            @AuthenticationPrincipal User currentUser,
+            @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
+        Page<LoanResponseDTO> loans = loanService.getLoansByUser(currentUser.getId(), pageable);
+        return ResponseEntity.ok(ApiResponse.success(loans, "Loans retrieved successfully"));
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<List<LoanResponseDTO>>> getAllLoans() {
-        List<LoanResponseDTO> loans = loanService.getAllLoans();
+    @PreAuthorize("hasAnyRole('ADMIN', 'ANALYST', 'LENDER')")
+    public ResponseEntity<ApiResponse<Page<LoanResponseDTO>>> getAllLoans(
+            @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
+        Page<LoanResponseDTO> loans = loanService.getAllLoans(pageable);
         return ResponseEntity.ok(ApiResponse.success(loans, "All loans retrieved successfully"));
     }
 
+    @GetMapping("/status/{status}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ANALYST', 'LENDER')")
+    public ResponseEntity<ApiResponse<Page<LoanResponseDTO>>> getLoansByStatus(
+            @PathVariable LoanStatus status,
+            @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
+        Page<LoanResponseDTO> loans = loanService.getLoansByStatus(status, pageable);
+        return ResponseEntity.ok(ApiResponse.success(loans, "Loans by status retrieved"));
+    }
+
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or @customSecurityExp.isOwner(authentication, @loanService.getLoanById(#id).getUserId())")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ANALYST', 'LENDER') or @customSecurityExp.isOwner(authentication, @loanService.getLoanById(#id).getUserId())")
     public ResponseEntity<ApiResponse<LoanResponseDTO>> getLoanById(@PathVariable Long id) {
-        LoanResponseDTO loan = loanService.getLoanById(id);
-        return ResponseEntity.ok(ApiResponse.success(loan, "Loan retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(
+                loanService.getLoanById(id), "Loan retrieved successfully"));
     }
 
     @PutMapping("/{id}/status")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LENDER')")
     public ResponseEntity<ApiResponse<LoanResponseDTO>> updateLoanStatus(
             @PathVariable Long id,
-            @RequestParam String status) {
-        
-        LoanResponseDTO loan = loanService.updateLoanStatus(id, status);
+            @RequestParam LoanStatus status,
+            @RequestParam(required = false) String lenderNote) {
+        LoanResponseDTO loan = loanService.updateLoanStatus(id, status, lenderNote);
         return ResponseEntity.ok(ApiResponse.success(loan, "Loan status updated to " + status));
     }
 }

@@ -1,6 +1,10 @@
 package com.loanmanagement.user;
 
 public enum Role {
-    USER,
-    ADMIN
+    ADMIN,
+    LENDER,
+    BORROWER,
+    ANALYST,
+    // Legacy alias — kept for backward compatibility
+    USER
 }

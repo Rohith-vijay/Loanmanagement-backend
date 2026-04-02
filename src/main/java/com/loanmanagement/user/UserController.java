@@ -1,15 +1,18 @@
 package com.loanmanagement.user;
 
+import com.loanmanagement.user.dto.ChangePasswordRequestDTO;
 import com.loanmanagement.user.dto.UpdateUserRequestDTO;
 import com.loanmanagement.user.dto.UserResponseDTO;
 import com.loanmanagement.util.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/users")
@@ -18,17 +21,25 @@ public class UserController {
 
     private final UserService userService;
 
+    @GetMapping("/profile")
+    public ResponseEntity<ApiResponse<UserResponseDTO>> getMyProfile(
+            @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(ApiResponse.success(
+                userService.mapToResponse(currentUser), "Profile retrieved successfully"));
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or @customSecurityExp.isOwner(authentication, #id)")
     public ResponseEntity<ApiResponse<UserResponseDTO>> getUserById(@PathVariable Long id) {
-        UserResponseDTO user = userService.getUserById(id);
-        return ResponseEntity.ok(ApiResponse.success(user, "User retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(
+                userService.getUserById(id), "User retrieved successfully"));
     }
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<List<UserResponseDTO>>> getAllUsers() {
-        List<UserResponseDTO> users = userService.getAllUsers();
+    public ResponseEntity<ApiResponse<Page<UserResponseDTO>>> getAllUsers(
+            @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
+        Page<UserResponseDTO> users = userService.getAllUsers(pageable);
         return ResponseEntity.ok(ApiResponse.success(users, "Users retrieved successfully"));
     }
 
@@ -37,8 +48,16 @@ public class UserController {
     public ResponseEntity<ApiResponse<UserResponseDTO>> updateUser(
             @PathVariable Long id,
             @Valid @RequestBody UpdateUserRequestDTO request) {
-        UserResponseDTO updatedUser = userService.updateUser(id, request);
-        return ResponseEntity.ok(ApiResponse.success(updatedUser, "User updated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(
+                userService.updateUser(id, request), "User updated successfully"));
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<ApiResponse<Void>> changePassword(
+            @AuthenticationPrincipal User currentUser,
+            @Valid @RequestBody ChangePasswordRequestDTO request) {
+        userService.changePassword(currentUser, request);
+        return ResponseEntity.ok(ApiResponse.success(null, "Password changed successfully"));
     }
 
     @DeleteMapping("/{id}")
