@@ -18,6 +18,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 
+import org.springframework.context.ApplicationEventPublisher;
+import com.loanmanagement.email.events.LoanEvent;
+import com.loanmanagement.loan.dto.LoanMapper;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -25,7 +29,8 @@ public class LoanService {
 
     private final LoanRepository loanRepository;
     private final UserRepository userRepository;
-    private final EmailService emailService;
+    private final ApplicationEventPublisher eventPublisher;
+    private final LoanMapper loanMapper;
 
     @Transactional
     public LoanResponseDTO applyForLoan(Long userId, LoanRequestDTO request) {
@@ -50,28 +55,28 @@ public class LoanService {
         log.info("Loan application submitted: loanId={}, userId={}, amount={}",
                 loan.getId(), userId, request.getPrincipalAmount());
 
-        return mapToResponse(loan);
+        return loanMapper.loanToLoanResponseDTO(loan);
     }
 
     @Transactional(readOnly = true)
     public Page<LoanResponseDTO> getLoansByUser(Long userId, Pageable pageable) {
-        return loanRepository.findByUserId(userId, pageable).map(this::mapToResponse);
+        return loanRepository.findByUserId(userId, pageable).map(loanMapper::loanToLoanResponseDTO);
     }
 
     @Transactional(readOnly = true)
     public Page<LoanResponseDTO> getAllLoans(Pageable pageable) {
-        return loanRepository.findAll(pageable).map(this::mapToResponse);
+        return loanRepository.findAll(pageable).map(loanMapper::loanToLoanResponseDTO);
     }
 
     @Transactional(readOnly = true)
     public Page<LoanResponseDTO> getLoansByStatus(LoanStatus status, Pageable pageable) {
-        return loanRepository.findByStatus(status, pageable).map(this::mapToResponse);
+        return loanRepository.findByStatus(status, pageable).map(loanMapper::loanToLoanResponseDTO);
     }
 
     @Transactional(readOnly = true)
     public LoanResponseDTO getLoanById(Long id) {
         Loan loan = findLoanById(id);
-        return mapToResponse(loan);
+        return loanMapper.loanToLoanResponseDTO(loan);
     }
 
     @Transactional
@@ -87,15 +92,13 @@ public class LoanService {
         if (newStatus == LoanStatus.APPROVED) {
             loan.setStartDate(LocalDateTime.now());
             loan.setEndDate(LocalDateTime.now().plusMonths(loan.getDurationMonths()));
-            emailService.sendLoanApprovalEmail(
-                    loan.getUser().getEmail(), loan.getUser().getName(), loan.getId());
+            eventPublisher.publishEvent(new LoanEvent(loan.getUser().getEmail(), loan.getUser().getName(), loan.getId(), "APPROVED"));
         } else if (newStatus == LoanStatus.REJECTED) {
-            emailService.sendLoanRejectionEmail(
-                    loan.getUser().getEmail(), loan.getUser().getName(), loan.getId());
+            eventPublisher.publishEvent(new LoanEvent(loan.getUser().getEmail(), loan.getUser().getName(), loan.getId(), "REJECTED"));
         }
 
         log.info("Loan status updated: loanId={}, newStatus={}", loanId, newStatus);
-        return mapToResponse(loanRepository.save(loan));
+        return loanMapper.loanToLoanResponseDTO(loanRepository.save(loan));
     }
 
     private void validateStatusTransition(LoanStatus current, LoanStatus next) {
@@ -135,26 +138,7 @@ public class LoanService {
     }
 
     public LoanResponseDTO mapToResponse(Loan loan) {
-        return LoanResponseDTO.builder()
-                .id(loan.getId())
-                .userId(loan.getUser().getId())
-                .userName(loan.getUser().getName())
-                .userEmail(loan.getUser().getEmail())
-                .principalAmount(loan.getPrincipalAmount())
-                .interestRate(loan.getInterestRate())
-                .durationMonths(loan.getDurationMonths())
-                .emiAmount(loan.getEmiAmount())
-                .remainingBalance(loan.getRemainingBalance())
-                .totalInterestPayable(calculateTotalInterest(loan))
-                .status(loan.getStatus())
-                .purpose(loan.getPurpose())
-                .lenderNote(loan.getLenderNote())
-                .riskScore(loan.getRiskScore())
-                .startDate(loan.getStartDate())
-                .endDate(loan.getEndDate())
-                .createdAt(loan.getCreatedAt())
-                .updatedAt(loan.getUpdatedAt())
-                .build();
+        return loanMapper.loanToLoanResponseDTO(loan);
     }
 
     public Loan findLoanById(Long id) {

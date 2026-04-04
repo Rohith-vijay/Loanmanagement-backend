@@ -20,7 +20,7 @@ public class RiskController {
     @GetMapping("/users/{userId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'ANALYST', 'LENDER') or @customSecurityExp.isOwner(authentication, #userId)")
     public ResponseEntity<ApiResponse<RiskScoreDTO>> getUserRiskScore(@PathVariable Long userId) {
-        RiskScoreDTO riskScore = riskService.calculateRiskScore(userId);
+        RiskScoreDTO riskScore = riskService.calculateRiskScore(userId, null, null);
         return ResponseEntity.ok(ApiResponse.success(riskScore, "Risk score calculated successfully"));
     }
 }

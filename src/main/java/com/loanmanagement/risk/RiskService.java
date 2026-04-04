@@ -25,7 +25,7 @@ public class RiskService {
     private final LoanRepository loanRepository;
     private final PaymentRepository paymentRepository;
 
-    public RiskScoreDTO calculateRiskScore(Long userId) {
+    public RiskScoreDTO calculateRiskScore(Long userId, java.math.BigDecimal loanAmount, java.math.BigDecimal interestRate) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
@@ -34,7 +34,14 @@ public class RiskService {
         int baseScore = 70; // Default average score for new users
         int score = baseScore;
         int defaultedLoansCount = 0;
-        int latePaymentsCount = 0; // In a real system, we'd compare payment date vs due date
+        int latePaymentsCount = 0; 
+
+        if (loanAmount != null && loanAmount.compareTo(java.math.BigDecimal.valueOf(50000)) > 0) {
+            score -= 10; // Penalty for large requested amounts
+        }
+        if (interestRate != null && interestRate.compareTo(java.math.BigDecimal.valueOf(15)) > 0) {
+            score -= 5; // Slight penalty for risky high interest loans
+        }
 
         if (!userLoans.isEmpty()) {
             for (Loan loan : userLoans) {
@@ -45,7 +52,6 @@ public class RiskService {
                     defaultedLoansCount++;
                 }
 
-                // Check payments for this loan
                 List<Payment> payments = paymentRepository.findByLoanId(loan.getId());
                 for (Payment payment : payments) {
                     if (payment.getStatus() == PaymentStatus.FAILED) {
@@ -56,7 +62,6 @@ public class RiskService {
             }
         }
 
-        // Cap score inside 0-100
         score = Math.max(0, Math.min(100, score));
 
         String riskLevel;

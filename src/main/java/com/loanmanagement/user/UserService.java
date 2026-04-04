@@ -20,16 +20,17 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final com.loanmanagement.user.dto.UserMapper userMapper;
 
     @Transactional(readOnly = true)
     public UserResponseDTO getUserById(Long id) {
         User user = findUserById(id);
-        return mapToResponse(user);
+        return userMapper.userToUserResponseDTO(user);
     }
 
     @Transactional(readOnly = true)
     public Page<UserResponseDTO> getAllUsers(Pageable pageable) {
-        return userRepository.findAll(pageable).map(this::mapToResponse);
+        return userRepository.findAll(pageable).map(userMapper::userToUserResponseDTO);
     }
 
     @Transactional
@@ -42,7 +43,7 @@ public class UserService {
         if (request.getRole() != null) user.setRole(request.getRole());
         if (request.getActive() != null) user.setActive(request.getActive());
 
-        return mapToResponse(userRepository.save(user));
+        return userMapper.userToUserResponseDTO(userRepository.save(user));
     }
 
     @Transactional
@@ -77,18 +78,6 @@ public class UserService {
     }
 
     public UserResponseDTO mapToResponse(User user) {
-        return UserResponseDTO.builder()
-                .id(user.getId())
-                .name(user.getName())
-                .email(user.getEmail())
-                .role(user.getRole())
-                .phone(user.getPhone())
-                .address(user.getAddress())
-                .active(user.getActive())
-                .emailVerified(user.getEmailVerified())
-                .provider(user.getProvider())
-                .createdAt(user.getCreatedAt())
-                .updatedAt(user.getUpdatedAt())
-                .build();
+        return userMapper.userToUserResponseDTO(user);
     }
 }

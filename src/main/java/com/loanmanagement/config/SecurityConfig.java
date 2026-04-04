@@ -110,6 +110,8 @@ public class SecurityConfig {
                 .requestMatchers("/error").permitAll()
                 // OPTIONS preflight
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                // Swagger UI and API Docs
+                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                 // All others require authentication
                 .anyRequest().authenticated()
             )

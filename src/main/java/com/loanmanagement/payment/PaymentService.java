@@ -19,6 +19,10 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import org.springframework.context.ApplicationEventPublisher;
+import com.loanmanagement.email.events.PaymentEvent;
+import com.loanmanagement.payment.dto.PaymentMapper;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -26,7 +30,8 @@ public class PaymentService {
 
     private final PaymentRepository paymentRepository;
     private final LoanRepository loanRepository;
-    private final EmailService emailService;
+    private final ApplicationEventPublisher eventPublisher;
+    private final PaymentMapper paymentMapper;
 
     @Transactional
     public PaymentResponseDTO makePayment(Long loanId, Long userId, PaymentRequestDTO request) {
@@ -72,36 +77,25 @@ public class PaymentService {
 
         loanRepository.save(loan);
 
-        emailService.sendPaymentSuccessEmail(loan.getUser().getEmail(), loan.getUser().getName(), loan.getId(), request.getAmount().toString());
+        eventPublisher.publishEvent(new PaymentEvent(loan.getUser().getEmail(), loan.getId(), request.getAmount(), "SUCCESS"));
         log.info("Payment {} made for loan {}", transactionRef, loanId);
 
-        return mapToResponse(payment);
+        return paymentMapper.paymentToPaymentResponseDTO(payment);
     }
 
     @Transactional(readOnly = true)
     public Page<PaymentResponseDTO> getPaymentsByLoan(Long loanId, Pageable pageable) {
-        return paymentRepository.findByLoanId(loanId, pageable).map(this::mapToResponse);
+        return paymentRepository.findByLoanId(loanId, pageable).map(paymentMapper::paymentToPaymentResponseDTO);
     }
 
     @Transactional(readOnly = true)
     public PaymentResponseDTO getPaymentById(Long id) {
         Payment payment = paymentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment not found with id: " + id));
-        return mapToResponse(payment);
+        return paymentMapper.paymentToPaymentResponseDTO(payment);
     }
 
     public PaymentResponseDTO mapToResponse(Payment payment) {
-        return PaymentResponseDTO.builder()
-                .id(payment.getId())
-                .loanId(payment.getLoan().getId())
-                .userName(payment.getLoan().getUser().getName())
-                .amount(payment.getAmount())
-                .paymentDate(payment.getPaymentDate())
-                .status(payment.getStatus())
-                .paymentMethod(payment.getPaymentMethod())
-                .transactionReference(payment.getTransactionReference())
-                .failureReason(payment.getFailureReason())
-                .createdAt(payment.getCreatedAt())
-                .build();
+        return paymentMapper.paymentToPaymentResponseDTO(payment);
     }
 }

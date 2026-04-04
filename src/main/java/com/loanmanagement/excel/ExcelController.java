@@ -34,7 +34,7 @@ public class ExcelController {
                 .body(new InputStreamResource(in));
     }
 
-    @PostMapping("/upload/loans")
+    @PostMapping(value = "/upload/loans", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> uploadLoansExcel(@RequestParam("file") MultipartFile file) {
         excelService.bulkUploadLoans(file);
