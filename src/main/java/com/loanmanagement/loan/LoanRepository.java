@@ -35,4 +35,7 @@ public interface LoanRepository extends JpaRepository<Loan, Long> {
 
     @Query("SELECT COUNT(l) FROM Loan l")
     long countAllLoans();
+
+    @Query("SELECT l.purpose, COUNT(l) FROM Loan l WHERE l.purpose IS NOT NULL GROUP BY l.purpose ORDER BY COUNT(l) DESC")
+    List<Object[]> countByPurpose();
 }

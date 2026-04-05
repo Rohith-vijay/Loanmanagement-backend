@@ -1,6 +1,7 @@
 package com.loanmanagement.admin;
 
 import com.loanmanagement.admin.dto.SystemOverviewDTO;
+import com.loanmanagement.audit.AuditLogRepository;
 import com.loanmanagement.loan.LoanRepository;
 import com.loanmanagement.loan.LoanStatus;
 import com.loanmanagement.payment.PaymentRepository;
@@ -21,6 +22,7 @@ public class AdminService {
     private final UserRepository userRepository;
     private final LoanRepository loanRepository;
     private final PaymentRepository paymentRepository;
+    private final AuditLogRepository auditLogRepository;
 
     public SystemOverviewDTO getSystemOverview() {
         log.info("Fetching system overview for admin dashboard");
@@ -47,7 +49,7 @@ public class AdminService {
                 .loanDistributionByStatus(loanStatusDist)
                 .paymentDistributionByStatus(paymentStatusDist)
                 .totalActiveUsers(userRepository.countActiveUsers())
-                .totalAuditEvents(1024L) // Currently mocked until full Audit module is operational
+                .totalAuditEvents(auditLogRepository.count())
                 .build();
     }
 }

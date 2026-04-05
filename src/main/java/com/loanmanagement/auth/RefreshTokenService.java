@@ -23,12 +23,8 @@ public class RefreshTokenService {
 
     @Transactional
     public RefreshToken createRefreshToken(User user) {
-        // Revoke existing token if present (token rotation)
-        refreshTokenRepository.findByUser(user)
-                .ifPresent(existing -> {
-                    existing.setRevoked(true);
-                    refreshTokenRepository.save(existing);
-                });
+        // Delete existing token if present to satisfy unique key constraints
+        refreshTokenRepository.deleteByUser(user);
 
         RefreshToken refreshToken = RefreshToken.builder()
                 .user(user)
