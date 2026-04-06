@@ -89,6 +89,11 @@ public class PaymentService {
     }
 
     @Transactional(readOnly = true)
+    public Page<PaymentResponseDTO> getAllPayments(Pageable pageable) {
+        return paymentRepository.findAll(pageable).map(paymentMapper::paymentToPaymentResponseDTO);
+    }
+
+    @Transactional(readOnly = true)
     public PaymentResponseDTO getPaymentById(Long id) {
         Payment payment = paymentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment not found with id: " + id));

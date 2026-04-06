@@ -62,4 +62,10 @@ public class AuthController {
         return ResponseEntity.badRequest()
                 .body(ApiResponse.error("OAuth2 login failed. Please try again."));
     }
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<ApiResponse<Void>> verifyEmail(@RequestParam String token) {
+        authService.verifyEmail(token);
+        return ResponseEntity.ok(ApiResponse.success(null, "Email verified successfully"));
+    }
 }

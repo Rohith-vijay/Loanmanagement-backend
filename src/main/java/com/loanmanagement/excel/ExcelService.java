@@ -4,6 +4,8 @@ import com.loanmanagement.exception.BadRequestException;
 import com.loanmanagement.loan.Loan;
 import com.loanmanagement.loan.LoanRepository;
 import com.loanmanagement.loan.LoanStatus;
+import com.loanmanagement.payment.Payment;
+import com.loanmanagement.payment.PaymentRepository;
 import com.loanmanagement.user.Role;
 import com.loanmanagement.user.User;
 import com.loanmanagement.user.UserRepository;
@@ -33,6 +35,7 @@ public class ExcelService {
     private final LoanRepository loanRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final PaymentRepository paymentRepository;
 
     // ─── GENERATE EXPORTS ─────────────────────────────────────────────────────
 
@@ -69,6 +72,41 @@ public class ExcelService {
         } catch (IOException e) {
             log.error("Failed to generate loans excel", e);
             throw new RuntimeException("Failed to generate excel file", e);
+        }
+    }
+
+    public ByteArrayInputStream generatePaymentsExcel() {
+        log.info("Generating Payments Excel export");
+        List<Payment> payments = paymentRepository.findAll();
+
+        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Payments");
+            CellStyle headerStyle = createHeaderStyle(workbook);
+
+            String[] columns = {"ID", "Loan ID", "User ID", "User Name", "Amount", "Status",
+                    "Payment Method", "Transaction Reference", "Payment Date", "Created At"};
+            createHeaderRow(sheet, headerStyle, columns);
+
+            int rowIdx = 1;
+            for (Payment payment : payments) {
+                Row row = sheet.createRow(rowIdx++);
+                row.createCell(0).setCellValue(payment.getId());
+                row.createCell(1).setCellValue(payment.getLoan().getId());
+                row.createCell(2).setCellValue(payment.getLoan().getUser().getId());
+                row.createCell(3).setCellValue(payment.getLoan().getUser().getName());
+                row.createCell(4).setCellValue(payment.getAmount().doubleValue());
+                row.createCell(5).setCellValue(payment.getStatus().name());
+                row.createCell(6).setCellValue(payment.getPaymentMethod() != null ? payment.getPaymentMethod().name() : "");
+                row.createCell(7).setCellValue(payment.getTransactionReference() != null ? payment.getTransactionReference() : "");
+                row.createCell(8).setCellValue(payment.getPaymentDate() != null ? payment.getPaymentDate().toString() : "");
+                row.createCell(9).setCellValue(payment.getCreatedAt() != null ? payment.getCreatedAt().toString() : "");
+            }
+
+            workbook.write(out);
+            return new ByteArrayInputStream(out.toByteArray());
+        } catch (IOException e) {
+            log.error("Failed to generate payments excel", e);
+            throw new RuntimeException("Failed to generate payments excel", e);
         }
     }
 

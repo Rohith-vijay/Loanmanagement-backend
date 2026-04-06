@@ -13,6 +13,7 @@ import com.loanmanagement.user.UserRepository;
 import com.loanmanagement.user.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -33,9 +34,20 @@ public class AuthService {
     private final UserService userService;
     private final RefreshTokenService refreshTokenService;
     private final EmailService emailService;
+    private final VerificationTokenRepository verificationTokenRepository;
+
+    @Value("${app.email-verification.enabled:false}")
+    private boolean emailVerificationEnabled;
 
     @Transactional
     public AuthResponseDTO login(LoginRequestDTO loginRequest) {
+        User userCheck = userRepository.findByEmail(loginRequest.getEmail())
+                .orElseThrow(() -> new BadRequestException("Invalid credentials"));
+        
+        if (emailVerificationEnabled && !userCheck.getEmailVerified()) {
+            throw new BadRequestException("Please verify your email address before logging in.");
+        }
+
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(loginRequest.getEmail(), loginRequest.getPassword())
         );
@@ -60,6 +72,8 @@ public class AuthService {
             throw new BadRequestException("Email address already in use");
         }
 
+        boolean autoVerify = !emailVerificationEnabled;
+
         User user = User.builder()
                 .name(request.getName())
                 .email(request.getEmail())
@@ -69,13 +83,32 @@ public class AuthService {
                 .role(request.getRole() != null ? request.getRole() : Role.BORROWER)
                 .provider("local")
                 .active(true)
-                .emailVerified(false)
+                .emailVerified(autoVerify)
                 .build();
 
         user = userRepository.save(user);
 
-        // Send welcome email (async)
-        emailService.sendWelcomeEmail(user.getEmail(), user.getName());
+        if (!autoVerify) {
+            log.info("Email verification enabled, generating verification token for: {}", user.getEmail());
+            String token = java.util.UUID.randomUUID().toString();
+            VerificationToken vt = VerificationToken.builder()
+                    .token(token)
+                    .user(user)
+                    .expiryDate(java.time.LocalDateTime.now().plusHours(24))
+                    .build();
+            verificationTokenRepository.save(vt);
+            emailService.sendVerificationEmail(user.getEmail(), user.getName(), token);
+
+            // Skip login since they must verify first
+            return AuthResponseDTO.builder()
+                    .accessToken(null)
+                    .refreshToken(null)
+                    .user(userService.mapToResponse(user))
+                    .build();
+        } else {
+            // Send welcome email (async)
+            emailService.sendWelcomeEmail(user.getEmail(), user.getName());
+        }
 
         // Authenticate to generate tokens
         Authentication authentication = authenticationManager.authenticate(
@@ -119,5 +152,22 @@ public class AuthService {
         refreshTokenService.revokeRefreshToken(user);
         SecurityContextHolder.clearContext();
         log.info("User logged out: {}", user.getEmail());
+    }
+
+    @Transactional
+    public void verifyEmail(String token) {
+        VerificationToken vt = verificationTokenRepository.findByToken(token)
+                .orElseThrow(() -> new BadRequestException("Invalid verification token"));
+
+        if (vt.getExpiryDate().isBefore(java.time.LocalDateTime.now())) {
+            throw new BadRequestException("Verification token has expired");
+        }
+
+        User user = vt.getUser();
+        user.setEmailVerified(true);
+        userRepository.save(user);
+        
+        verificationTokenRepository.delete(vt);
+        log.info("Email verified for user: {}", user.getEmail());
     }
 }

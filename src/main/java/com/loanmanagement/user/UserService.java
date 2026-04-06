@@ -21,6 +21,8 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final com.loanmanagement.user.dto.UserMapper userMapper;
+    private final com.loanmanagement.auth.RefreshTokenRepository refreshTokenRepository;
+    private final com.loanmanagement.auth.VerificationTokenRepository verificationTokenRepository;
 
     @Transactional(readOnly = true)
     public UserResponseDTO getUserById(Long id) {
@@ -65,9 +67,12 @@ public class UserService {
 
     @Transactional
     public void deleteUser(Long id) {
-        if (!userRepository.existsById(id)) {
-            throw new ResourceNotFoundException("User not found with id " + id);
-        }
+        User user = findUserById(id);
+        
+        // Clean up dependent entities that do not cascade automatically
+        refreshTokenRepository.deleteByUser(user);
+        verificationTokenRepository.deleteByUser_Id(id);
+        
         userRepository.deleteById(id);
         log.info("User deleted: id={}", id);
     }

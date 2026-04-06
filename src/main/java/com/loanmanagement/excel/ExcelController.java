@@ -33,6 +33,18 @@ public class ExcelController {
                 .body(new InputStreamResource(in));
     }
 
+    @GetMapping("/download/payments")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ANALYST')")
+    public ResponseEntity<InputStreamResource> downloadPaymentsExcel() {
+        ByteArrayInputStream in = excelService.generatePaymentsExcel();
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("Content-Disposition", "attachment; filename=payments_report.xlsx");
+        return ResponseEntity.ok()
+                .headers(headers)
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(new InputStreamResource(in));
+    }
+
     @GetMapping("/download/users")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<InputStreamResource> downloadUsersExcel() {

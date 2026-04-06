@@ -50,6 +50,15 @@ public class EmailService {
     }
 
     @Async("emailTaskExecutor")
+    public void sendVerificationEmail(String toEmail, String userName, String token) {
+        String subject = "Verify Your Email - Loan Management System";
+        // In reality, this would be a link to the frontend which then calls the backend API
+        String verifyUrl = String.format("http://localhost:5173/verify-email?token=%s", token);
+        String body = String.format("Dear %s,\n\nPlease verify your email address to activate your account and gain full access to the Loan Management System.\n\nClick the link below to verify:\n%s\n\nThis link will expire in 24 hours.\n\nThank you.", userName, verifyUrl);
+        sendEmail(toEmail, subject, body);
+    }
+
+    @Async("emailTaskExecutor")
     public void sendLoanApprovalEmail(String toEmail, String userName, Long loanId) {
         String subject = "Loan Approved - Loan Management System";
         String body = String.format("Dear %s,\n\nYour loan application (ID: %d) has been approved.\n\nThank you for choosing us.", userName, loanId);

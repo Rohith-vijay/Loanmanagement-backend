@@ -7,6 +7,8 @@ import com.loanmanagement.loan.LoanService;
 import com.loanmanagement.loan.dto.LoanResponseDTO;
 import com.loanmanagement.user.UserService;
 import com.loanmanagement.user.dto.UserResponseDTO;
+import com.loanmanagement.payment.PaymentService;
+import com.loanmanagement.payment.dto.PaymentResponseDTO;
 import com.loanmanagement.util.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -29,9 +31,10 @@ public class AdminController {
     private final UserService userService;
     private final AuditService auditService;
     private final LoanService loanService;
+    private final PaymentService paymentService;
 
     @GetMapping("/overview")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ANALYST')")
     public ResponseEntity<ApiResponse<SystemOverviewDTO>> getSystemOverview() {
         SystemOverviewDTO overview = adminService.getSystemOverview();
         return ResponseEntity.ok(ApiResponse.success(overview, "System overview retrieved successfully"));
@@ -58,5 +61,13 @@ public class AdminController {
             @PageableDefault(size = 20) Pageable pageable) {
         Page<LoanResponseDTO> loans = loanService.getAllLoans(pageable);
         return ResponseEntity.ok(ApiResponse.success(loans, "All loans retrieved successfully"));
+    }
+
+    @GetMapping("/transactions")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Page<PaymentResponseDTO>>> getAllTransactions(
+            @PageableDefault(size = 20, sort = "paymentDate", direction = org.springframework.data.domain.Sort.Direction.DESC) Pageable pageable) {
+        Page<PaymentResponseDTO> transactions = paymentService.getAllPayments(pageable);
+        return ResponseEntity.ok(ApiResponse.success(transactions, "All transactions retrieved successfully"));
     }
 }
