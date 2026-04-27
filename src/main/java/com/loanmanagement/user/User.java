@@ -72,6 +72,18 @@ public class User implements UserDetails {
         this.updatedAt = LocalDateTime.now();
     }
 
+    @PrePersist
+    public void prePersist() {
+        if (this.createdAt == null) this.createdAt = LocalDateTime.now();
+        if (this.updatedAt == null) this.updatedAt = LocalDateTime.now();
+        
+        // Fail-safe for password: if null or empty (common for OAuth2 users), 
+        // provide a random UUID to satisfy database NOT NULL constraints.
+        if (this.password == null || this.password.isBlank()) {
+            this.password = "OAUTH2_USER_" + java.util.UUID.randomUUID().toString();
+        }
+    }
+
     // ─── UserDetails implementation ───────────────────────────────────────────
 
     @Override

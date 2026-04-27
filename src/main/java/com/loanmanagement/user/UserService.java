@@ -40,6 +40,17 @@ public class UserService {
         User user = findUserById(id);
 
         if (request.getName() != null) user.setName(request.getName());
+        if (request.getEmail() != null && !request.getEmail().equals(user.getEmail())) {
+            // Check if email already exists
+            if (userRepository.existsByEmail(request.getEmail())) {
+                throw new BadRequestException("Email address already in use");
+            }
+            user.setEmail(request.getEmail());
+            // Need to re-verify if email verification is enabled.
+            // For now, keep it simple and just update.
+            user.setEmailVerified(false); 
+            // In a full implementation we'd send a new verification email here
+        }
         if (request.getPhone() != null) user.setPhone(request.getPhone());
         if (request.getAddress() != null) user.setAddress(request.getAddress());
         if (request.getRole() != null) user.setRole(request.getRole());

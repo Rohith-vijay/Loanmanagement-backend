@@ -4,6 +4,8 @@ import com.loanmanagement.auth.dto.AuthResponseDTO;
 import com.loanmanagement.auth.dto.LoginRequestDTO;
 import com.loanmanagement.auth.dto.RefreshTokenRequestDTO;
 import com.loanmanagement.auth.dto.RegisterRequestDTO;
+import com.loanmanagement.auth.dto.ForgotPasswordRequestDTO;
+import com.loanmanagement.auth.dto.ResetPasswordRequestDTO;
 import com.loanmanagement.user.User;
 import com.loanmanagement.user.UserService;
 import com.loanmanagement.user.dto.UserResponseDTO;
@@ -67,5 +69,17 @@ public class AuthController {
     public ResponseEntity<ApiResponse<Void>> verifyEmail(@RequestParam String token) {
         authService.verifyEmail(token);
         return ResponseEntity.ok(ApiResponse.success(null, "Email verified successfully"));
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(@Valid @RequestBody ForgotPasswordRequestDTO request) {
+        authService.forgotPassword(request.getEmail());
+        return ResponseEntity.ok(ApiResponse.success(null, "Password reset link sent to your email"));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody ResetPasswordRequestDTO request) {
+        authService.resetPassword(request.getToken(), request.getNewPassword());
+        return ResponseEntity.ok(ApiResponse.success(null, "Password reset successfully"));
     }
 }

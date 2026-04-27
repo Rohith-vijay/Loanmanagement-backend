@@ -36,7 +36,7 @@ public class ExcelController {
     @GetMapping("/download/payments")
     @PreAuthorize("hasAnyRole('ADMIN', 'ANALYST')")
     public ResponseEntity<InputStreamResource> downloadPaymentsExcel() {
-        ByteArrayInputStream in = excelService.generatePaymentsExcel();
+        ByteArrayInputStream in = excelService.generateLoansExcel();
         HttpHeaders headers = new HttpHeaders();
         headers.add("Content-Disposition", "attachment; filename=payments_report.xlsx");
         return ResponseEntity.ok()

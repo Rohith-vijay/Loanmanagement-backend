@@ -12,9 +12,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
-
+import java.util.UUID;
 import java.io.IOException;
 
 @Component
@@ -28,6 +29,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     private final JwtTokenProvider tokenProvider;
     private final RefreshTokenService refreshTokenService;
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request,
@@ -73,6 +75,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
             User newUser = User.builder()
                     .email(finalEmail)
                     .name(finalName)
+                    .password(passwordEncoder.encode(UUID.randomUUID().toString())) // Dummy password for OAuth users
                     .provider(resolvedProviderName)
                     .providerId(resolvedProviderId)
                     .emailVerified(true)

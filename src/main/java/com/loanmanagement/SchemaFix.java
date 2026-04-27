@@ -44,5 +44,12 @@ public class SchemaFix {
         } catch(Exception e) {
             System.out.println("SCHEMA FIX (audit_logs): " + e.getMessage());
         }
+        // Fix users.password to allow NULL (for OAuth2 users)
+        try {
+            jdbcTemplate.execute("ALTER TABLE users MODIFY COLUMN password VARCHAR(255) NULL");
+            System.out.println("SCHEMA FIXED: users.password modified to allow NULL");
+        } catch(Exception e) {
+            System.out.println("SCHEMA FIX (users.password): " + e.getMessage());
+        }
     }
 }

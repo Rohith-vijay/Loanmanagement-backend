@@ -85,4 +85,12 @@ public class EmailService {
         String body = String.format("Dear %s,\n\nThis is a friendly reminder that your EMI of ₹%s for Loan ID %d is due on %s.\n\nPlease ensure your account has sufficient balance.\n\nThank you.", userName, emiAmount, loanId, dueDate);
         sendEmail(toEmail, subject, body);
     }
+
+    @Async("emailTaskExecutor")
+    public void sendPasswordResetEmail(String toEmail, String userName, String token) {
+        String subject = "Reset Password - Loan Management System";
+        String resetUrl = String.format("http://localhost:5173/reset-password?token=%s", token);
+        String body = String.format("Dear %s,\n\nYou have requested to reset your password.\n\nClick the link below to reset it:\n%s\n\nThis link will expire in 1 hour.\n\nIf you did not request this, please ignore this email.\n\nThank you.", userName, resetUrl);
+        sendEmail(toEmail, subject, body);
+    }
 }
