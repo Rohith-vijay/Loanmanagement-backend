@@ -17,7 +17,7 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
-    @Value("${app.mail.from:noreply@loanmanagementsystem.com}")
+    @Value("${spring.mail.username}")
     private String fromAddress;
 
     @Retryable(
